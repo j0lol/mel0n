@@ -1,0 +1,16 @@
+[package]
+name = "melon-gba"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agb = { git = "https://github.com/agbrs/agb" }
+
+[profile.dev]
+opt-level = 3
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+debug = true

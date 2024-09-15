@@ -29,7 +29,7 @@ impl Fruit {
     pub fn get_position(&self) -> Vector2D<Fixed> {
         self.real_position
     }
-    
+
     pub fn set_position(&mut self, position: Vector2D<Fixed>) {
         self.real_position = position;
         self.world_object.set_position(position.floor() - Vector2D::new(16, 16));

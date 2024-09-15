@@ -1,4 +1,3 @@
-use crate::math_helpers::fvec;
 use crate::physics::Wall::{Horizontal, Vertical};
 use crate::{Fixed, FLOOR, WALL_L, WALL_R};
 use agb::fixnum::{num, Num, Vector2D};
@@ -115,43 +114,20 @@ impl Circle {
         match wall {
             Horizontal(x, H::Left)  => {
                 let intersection = Num::new(x) - (self.position.x - self.radius);
-                // println!("HLEFT INT {intersection}");
                 (intersection > num!(0.)).then_some(Vector2D::new(intersection, num!(0.)))
             }
             Horizontal(x, H::Right)  => {
-                // (self.position.x + self.radius > x).then_some(C::Right)
                 let intersection = (self.position.x + self.radius) - Num::new(x);
-                // println!("HRIGHT INT {intersection}");
                 (intersection > num!(0.)).then_some(Vector2D::new(-intersection, num!(0.)))
             }
             Vertical(y, V::Bottom) => {
-                // (self.position.y + self.radius > y).then_some(C::Down)
                 let intersection = (self.position.y + self.radius) - Num::new(y);
-                // println!("FLOOR INT {intersection}");
                 (intersection > num!(0.)).then_some(Vector2D::new(num!(0.), -intersection))
             }
-            // Vertical(y, dir) if dir == V::Top => {
-            //     // (self.position.y - self.radius < y).then_some(C::Up)
-            //     let intersection = self.position.y - self.radius;
-            //     (intersection < y).then_some(fvec(0., -intersection as f32))
-            // }
             _ => unreachable!()
         }
     }
 }
-
-#[derive(PartialOrd, PartialEq)]
-enum CircleResult {
-    NotIntersecting,
-    Intersecting(Fixed, (Option<CollisionDirection>, Option<CollisionDirection>))
-}
-
-fn point_in_circle(x: Circle, p: Vector2D<Fixed>) -> bool {
-    let distance = (p.change_base() - x.position).magnitude_squared();
-    distance > (x.radius^2).into()
-}
-
-
 
 pub fn clamp<T: PartialOrd + Copy + Clone + agb::fixnum::Number>(n: Vector2D<T>, lower: Vector2D<T>, upper: Vector2D<T>) -> Vector2D<T>{
     let mut out = n;

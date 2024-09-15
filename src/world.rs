@@ -23,7 +23,7 @@ impl State {
         object.show_affine(AffineDouble);
         // let index = self.objects.len();
         // self.objects.push(object);
-        
+
         let new_fruit = Fruit {
             world_object: object,
             real_position: position.change_base(),

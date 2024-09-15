@@ -66,18 +66,6 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
         fruits: Default::default()
     };
 
-    // let cursor = {
-    //     let palette: [u16; 16] = (&PASTEL[0..16]).try_into().unwrap();
-    //     let mut cursor = DynamicSprite::new(S8x8);
-    //     cursor.clear(1);
-    //     let cursor = cursor.to_vram(PaletteVram::new(&Palette16::new(palette)).unwrap());
-    //     let mut cursor = s.gfx.object(cursor);
-    //     cursor.show();
-    // 
-    //     cursor.set_position(Vector2D::new(90, 30));
-    //     cursor
-    // };
-    
     s.cursor_position = Vector2D::new(90, 30);
     
     let melon_sprite = GRAPHICS.sprites().get(3).unwrap();
@@ -86,38 +74,11 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
         Box::new(sprites.get_vram_sprite(melon_sprite))
     );
 
-    let palette: [u16; 16] = (&PASTEL[0..16]).try_into().unwrap();
-
     let mut input = ButtonController::new();
 
-    // let mut cursor = DynamicSprite::new(S8x8);
-    // cursor.clear(1);
-    // let cursor = cursor.to_vram(PaletteVram::new(&Palette16::new(palette)).unwrap());
-    // let mut cursor = s.gfx.object(cursor);
-    // cursor.show();
-    // 
-    // cursor.set_position(Vector2D::new(90, 30));
-
-    let mut fruits: Vec<Fruit> = Vec::new();
-
     let v_blank = VBlank::get();
-
-    // {
-    //     let _ = s.new_fruit(Vector2D::new(cursor.position().x, 0));
-    // }
-    // let block = Fruit::new(&mut s, Vector2D::new(cursor.position().x, 0), num!(360.0)/64);
-    // s.fruits.push(block);
-
-    // s.new_fruit(s.cursor_position);
-
-    // let sprite = *s.sprites[0].clone();
-    // let object = s.gfx.object(sprite);
+    
     s.new_fruit(Vector2D::new(90, 20));
-
-
-
-    let time_delta: Num<i32, 8> = num!(0.025);
-    let mut frame_count: i32 = 0;
 
     let mut my_melon = 0;
 
@@ -142,25 +103,9 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
         }
         aim = iclamp(aim, WALL_L + 8, WALL_R - 8);
         
-        // println!("AIM: {aim}");
-
-        frame_count += 1;
-
-        // let circles: Vec<_> = blocks
-        //     .iter()
-        //     .map(|obj| {
-        //     Circle {
-        //         position: obj.object.position() + Vector2D::new(16, 16),
-        //         radius: obj.shape.radius as i32,
-        //         velocity: obj.velocity
-        //     }
-        // }).collect();
-        
         for fruit in s.fruits.iter_mut() {
             fruit.collided_with_fruits = vec![];
         }
-
-        println!("FRUITS {}", s.fruits.len());
         
         for current_fruit in 0..s.fruits.len() {
 
@@ -196,8 +141,6 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
             } else { fsplat(0.0) });
             fruit_physics_object.position += fruit.velocity.0;
             
-            // println!("Potential Velocity {:?}", fruit_physics_object.velocity.0);
-            
             // Collide with other fruits
             {
                 let rest: Vec<_> = {
@@ -211,10 +154,8 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                 };
 
                 for (n, other_fruit) in rest.into_iter() {
-                    // println!("COLLIDE WITH FRUIT");
                     let circle_nudge = fruit_physics_object.intersects(other_fruit.circle());
                     if circle_nudge.is_some() {
-                        // println!("SWAP");
                         collided_with.push(n);
                         
                         swap(&mut -fruit_physics_object.velocity.0, &mut -other_fruit.velocity.0);
@@ -236,10 +177,6 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
             
             // Resolve problem
             let fruit = &mut s.fruits[current_fruit];
-            // println!("Pos {:?}", fruit.get_position());
-            // println!("Nudge {:?}", nudge);
-            // println!("Potential Velocity {:?}", fruit_physics_object.velocity.0);
-            // println!("Vel {:?}", fruit.velocity.0);
 
             if fruit.state == FruitState::Falling {
                 let still = fruit_physics_object.velocity.0 == -nudge;
@@ -265,19 +202,6 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
     }
 }
 
-// fn new_melon<'a, 'c>(state: &'a mut State<'_, 'c>, input: &ButtonController, cursor: &Object) -> Fruit {
-//     let spin = {
-//         if input.is_pressed(Button::LEFT) {
-//             num!(360.0)/32
-//         } else if input.is_pressed(Button::RIGHT) {
-//             num!(-360.0)/32
-//         } else {
-//             num!(360.0)/256
-//         }
-//     };
-//     Fruit::new(state, Vector2D::new(cursor.x() as i32, 20), spin)
-// }
-
 #[agb::entry]
 fn main(mut gba: Gba) -> ! {
     {
@@ -298,21 +222,6 @@ fn main(mut gba: Gba) -> ! {
     let gba: &'static mut Gba = Box::leak(Box::new(gba));
 
     falling_block_game(gba);
-
-        // loop {
-        //
-        //     let (t0, mut vram) = gba.display.video.tiled0();
-        //
-        //     let mut map = t0.background(
-        //         Priority::P0,
-        //         RegularBackgroundSize::Background32x32,
-        //         generated_background::DATA.tiles.format()
-        //     );
-        //
-        //     // let mut vram = poke_vram(vram);
-        //
-        //     agb::display::example_logo::display_logo_basic(&mut map, &mut vram);
-        // }
 }
 
 

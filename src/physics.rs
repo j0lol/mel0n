@@ -59,7 +59,6 @@ pub enum Wall {
 
 pub static PLAY_AREA: (Wall, Wall, Wall) = (Horizontal(WALL_L, WallDirectionHorizontal::Left), Horizontal(WALL_R, WallDirectionHorizontal::Right), Vertical(FLOOR, WallDirectionVertical::Bottom));
 
-
 impl Circle {
 
     /// Returns a vector containing the amount in each direction that the circle intersected with another.
@@ -97,11 +96,8 @@ impl Circle {
 
     pub fn in_playfield(self: Circle) -> Option<Vector2D<Fixed>> {
         
-        
         let in_floor = self.in_wall(Wall::Vertical(FLOOR, WallDirectionVertical::Bottom));
-
         let in_wall_l = self.in_wall(Wall::Horizontal(WALL_L, WallDirectionHorizontal::Left));
-        
         let in_wall_r = self.in_wall(Wall::Horizontal(WALL_R, WallDirectionHorizontal::Right));
         
         in_floor.or(in_wall_l.or(in_wall_r))

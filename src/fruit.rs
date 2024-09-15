@@ -4,7 +4,7 @@ use agb::display::object::ObjectUnmanaged;
 use agb::fixnum::Vector2D;
 use alloc::vec::Vec;
 
-pub(crate) const TERMINAL_VELOCITY: f32 = 6.0;
+pub(crate) const TERMINAL_VELOCITY: f32 = 600.0;
 
 pub struct Rotation {
     pub(crate) angle: Fixed,

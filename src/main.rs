@@ -117,7 +117,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
             // Make potential physics object
             let mut fruit_physics_object = fruit.circle();
             fruit_physics_object.velocity = Velocity(if fruit.state != FruitState::Held {
-                let gravity: Fixed = Num::new(100)/100;
+                let gravity: Fixed = Num::new(98)/1000;
                 clamp(
                     fruit.velocity.0 + Vector2D::new(num!(0.), gravity),
                     fsplat(-TERMINAL_VELOCITY),
@@ -174,6 +174,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
             }
 
             fruit.set_position(fruit.get_position() + fruit_physics_object.velocity.0 + nudge);
+            fruit.velocity = fruit_physics_object.velocity;
             fruit.collided_with_fruits = collided_with;
         }
 

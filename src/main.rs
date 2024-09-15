@@ -4,6 +4,7 @@
 #![cfg_attr(test, reexport_test_harness_main = "test_main")]
 #![cfg_attr(test, test_runner(agb::test_runner::test_runner))]
 
+use alloc::borrow::ToOwned;
 use agb::display::tiled::TiledMap;
 pub mod physics;
 pub mod fruit;
@@ -19,7 +20,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::mem::swap;
 use agb::display::object::{AffineMatrixInstance, Graphics, ObjectUnmanaged};
-use agb::display::Priority;
+use agb::display::{Priority, HEIGHT, WIDTH};
 use agb::fixnum::{num, Num, Vector2D};
 use agb::{include_aseprite, include_background_gfx, println, Gba};
 use agb::display::affine::{AffineMatrix};
@@ -34,6 +35,7 @@ const WALL_L: i32 = 62;
 const WALL_R: i32 = 179;
 
 static GRAPHICS: &Graphics = include_aseprite!("gfx/fruits.aseprite");
+static MISC_GRAPHICS: &Graphics = include_aseprite!("gfx/misc.aseprite");
 
 include_background_gfx!(generated_background, "000000", DATA => "gfx/test_logo_basic.png");
 
@@ -48,8 +50,10 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
         objects: Default::default(),
         cursor_position: isplat(0),
         sprites: Default::default(),
-        fruits: Default::default()
+        fruits: Default::default(),
     };
+    
+    // let mut misc_objects: Vec<ObjectUnmanaged> = vec![];
 
     s.cursor_position = Vector2D::new(90, 30);
     
@@ -58,12 +62,20 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
     s.sprites.push(
         Box::new(sprites.get_vram_sprite(melon_sprite))
     );
+    
+    // let cross_sprite = MISC_GRAPHICS.sprites().first().unwrap();
+    // 
+    // s.sprites.push(
+    //     Box::new(sprites.get_vram_sprite(cross_sprite))
+    // );
 
     let mut input = ButtonController::new();
 
     let v_blank = VBlank::get();
+    
+    const NEW_MELON_HEIGHT: i32 = 16;
 
-    s.new_fruit(Vector2D::new(90, 20));
+    s.new_fruit(Vector2D::new(90, NEW_MELON_HEIGHT));
 
     let mut my_melon = 0;
 
@@ -101,14 +113,18 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                     fruit.state = FruitState::Falling ;
                 } else {
                     if input.is_pressed(Button::LEFT) {
-                        fruit.set_position(fruit.get_position() + fvec(-1., 0.)) ;
+                        fruit.set_position(fruit.get_position() + fvec(-1., 0.));
                     }
                     if input.is_pressed(Button::RIGHT) {
-                        fruit.set_position(fruit.get_position() + fvec(1., 0.)) ;
+                        fruit.set_position(fruit.get_position() + fvec(1., 0.));
                     }
+                    fruit.set_position(clamp(fruit.get_position(), fvec(WALL_L as f32 + 8.0, 0.0), fvec( WALL_R as f32 - 8.0, WIDTH as f32)));
                     continue;
                 }
             }
+
+            fruit.rotation.angle += fruit.rotation.speed;
+            fruit.world_object.set_affine_matrix(s.affines[affine_index(fruit.rotation.angle)].clone());
 
             let mut collided_with = vec![];
 
@@ -133,7 +149,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                         .iter_mut()
                         .enumerate()
                         .filter(|(n, fruit)| {*n != current_fruit
-                            && !fruit.collided_with_fruits.contains(&current_fruit)
+                            // && !fruit.collided_with_fruits.contains(&current_fruit)
                         })
                         .collect()
                 };
@@ -141,24 +157,48 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                 for (n, other_fruit) in rest.into_iter() {
                     let circle_nudge = fruit_physics_object.intersects(other_fruit.circle());
                     if circle_nudge.is_some() {
-                        collided_with.push(n);
+                        
+                        // let mut marker_obj = ObjectUnmanaged::new(*s.sprites[1].to_owned());
+                        // marker_obj.set_position((fruit_physics_object.position + circle_nudge.unwrap()).floor());
+                        // marker_obj.show();
+                        // misc_objects.push(marker_obj);
+                        
+                        // collided_with.push(n);
 
-                        swap(&mut -fruit_physics_object.velocity.0, &mut -other_fruit.velocity.0);
-                        other_fruit.set_position(
-                            other_fruit.get_position() +
-                                other_fruit.circle().intersects(fruit_physics_object).unwrap_or(fsplat(0.0))
-                                + other_fruit.circle().in_playfield().unwrap_or(fsplat(0.0))
-
-                        )
+                        // swap(&mut fruit_physics_object.velocity.0, &mut other_fruit.velocity.0);
+                        // other_fruit.set_position(
+                        //     other_fruit.get_position() +
+                        //         other_fruit.circle().intersects(fruit_physics_object).unwrap_or(fsplat(0.0))
+                        // 
+                        // );
+                        // other_fruit.set_position(
+                        //     other_fruit.get_position() +
+                        //         other_fruit.circle().in_playfield().unwrap_or(fsplat(0.0))
+                        // );
                     }
-                    nudge += circle_nudge.unwrap_or(fsplat(0.0));
+                    // nudge += circle_nudge.unwrap_or(fsplat(0.0));
                 };
             }
 
             // Collide with walls
             let wall_nudge = fruit_physics_object.in_playfield().unwrap_or(fsplat(0.0));
 
-            nudge += wall_nudge;
+            if wall_nudge.y != num!(0.) {
+                fruit_physics_object.velocity.0.y *= num!(-0.2);
+
+                if fruit_physics_object.velocity.0.y.abs() <= num!(0.2) {
+                    fruit_physics_object.velocity.0.y = num!(0.);
+                }
+            }
+            
+            if wall_nudge.x != num!(0.) {
+                fruit_physics_object.velocity.0.x *= num!(-0.2);
+                if fruit_physics_object.velocity.0.x.abs() <= num!(0.2) {
+                    fruit_physics_object.velocity.0.x = num!(0.);
+                }
+            }
+
+            // nudge += wall_nudge;
 
             // Resolve problem
             let fruit = &mut s.fruits[current_fruit];
@@ -173,6 +213,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                 }
             }
 
+            println!("FRUIT {current_fruit} VELOCITY {:?}", fruit_physics_object.velocity.0);
             fruit.set_position(fruit.get_position() + fruit_physics_object.velocity.0 + nudge);
             fruit.velocity = fruit_physics_object.velocity;
             fruit.collided_with_fruits = collided_with;
@@ -180,11 +221,13 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
 
         if s.fruits.get(my_melon).is_some_and(|fruit| fruit.state == FruitState::Rolling) {
             ground_timer = 30;
-            s.new_fruit(Vector2D::new(aim, 20));
+            s.new_fruit(Vector2D::new(aim, NEW_MELON_HEIGHT));
             my_melon += 1;
         }
 
-        write_to_oam(unmanaged.iter(), &s.fruits.iter().map(|x| {x.world_object.clone()}).collect())
+        write_to_oam(unmanaged.iter(), &s.fruits.iter().map(|x| {x.world_object.clone()}).collect());
+        
+        // write_to_oam(unmanaged.iter(), &misc_objects);
     }
 }
 

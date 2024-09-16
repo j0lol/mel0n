@@ -1,4 +1,5 @@
-use agb::fixnum::{Num, Vector2D};
+use agb::fixnum::{num, Num, Vector2D};
+use crate::Fixed;
 
 pub fn fvec<T: agb::fixnum::Number + agb::fixnum::FixedWidthUnsignedInteger, const N: usize>(
     x: f32,
@@ -27,4 +28,18 @@ pub fn iclamp<T: PartialOrd + Copy + Clone + agb::fixnum::Number>(n: T, lower:T,
     if n > upper { out = upper; }
 
     out
+}
+
+
+
+pub trait FixedExtend {
+    
+    fn acos(self) -> Self;
+}
+
+impl FixedExtend for Fixed {
+    fn acos(self) -> Self {
+        let x = self;
+        num!(1.57079) - num!(1.57079) * x
+    }
 }

@@ -185,7 +185,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                     let circle_nudge = fruit_physics_object.intersects(other_fruit.circle());
                     if let Some( circle_nudge) = circle_nudge {
                         
-                        fruit_physics_object.position += nudge;
+                        // fruit_physics_object.position += nudge;
                         let mut marker_obj = ObjectUnmanaged::new(*s.sprites[1].to_owned());
                         marker_obj.set_position(fruit_physics_object.position.floor() - isplat(4));
                         marker_obj.show();
@@ -242,8 +242,6 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                 };
             }
 
-
-
             // if nudge != fsplat(0.0) {
             //     if fruit_physics_object.velocity.0.x.abs() <= num!(0.3) {
             //         fruit_physics_object.velocity.0.x = num!(0.);
@@ -254,15 +252,15 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
             //         nudge.y = num!(0.);
             //     }
             // }
-            
-            
+
+
             // Resolve problem
             let fruit = &mut s.fruits[current_fruit];
 
             if fruit.state == FruitState::Rolling {
                 fruit_physics_object.velocity.0.x *= num!(0.98);
             }
-            
+
             if fruit.state == FruitState::Falling {
                 // let still = fruit_physics_object.velocity.0 == -nudge;
                 // if still {
@@ -273,8 +271,8 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                 }
             }
 
-            println!("FRUIT {current_fruit} POSITION {:?}", fruit_physics_object.position);
-            println!("FRUIT {current_fruit} VELOCITY {:?}", fruit_physics_object.velocity.0);
+            // println!("FRUIT {current_fruit} POSITION {:?}", fruit_physics_object.position);
+            // println!("FRUIT {current_fruit} VELOCITY {:?}", fruit_physics_object.velocity.0);
             fruit.set_position(fruit.get_position() + fruit_physics_object.velocity.0 + nudge);
             fruit.set_position(clamp(
                 fruit.get_position(), 
@@ -289,7 +287,61 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
             fruit.rotation.angle += (fruit.velocity.0.magnitude() * 3) * -moving_left * still;
             fruit.world_object.set_affine_matrix(s.affines[affine_index(fruit.rotation.angle)].clone());
         }
-        
+
+
+        for current_fruit in 0..s.fruits.len() {
+
+            // Get fruit & change state
+            let fruit = &mut s.fruits[current_fruit];
+            if fruit.state == FruitState::Held {
+                continue;
+            }
+
+
+            let mut nudge: Vector2D<_> = Default::default();
+
+            // Make potential physics object
+            let mut fruit_physics_object = fruit.circle();
+            fruit_physics_object.velocity = Velocity(if fruit.state != FruitState::Held {
+                clamp(
+                    fruit.velocity.0,
+                    fsplat(-TERMINAL_VELOCITY),
+                    fsplat(TERMINAL_VELOCITY)
+                )
+            } else { fsplat(0.0) });
+            fruit_physics_object.position += fruit.velocity.0;
+
+            // Resolve problem
+            let fruit = &mut s.fruits[current_fruit];
+
+            if fruit.state == FruitState::Rolling {
+                fruit_physics_object.velocity.0.x *= num!(0.98);
+            }
+
+            if fruit.state == FruitState::Falling {
+                // let still = fruit_physics_object.velocity.0 == -nudge;
+                // if still {
+                ground_timer -= 1;
+                // }
+                if ground_timer == 0 {
+                    fruit.state = FruitState::Rolling;
+                }
+            }
+
+            fruit.set_position(fruit.get_position() + fruit_physics_object.velocity.0 + nudge);
+            fruit.set_position(clamp(
+                fruit.get_position(),
+                fvec((WALL_L + fruit.radius as i32) as f32, 0.0 + fruit.radius as f32),
+                fvec((WALL_R - fruit.radius as i32) as f32, (HEIGHT - fruit.radius as i32) as f32)
+            ));
+            fruit.velocity = fruit_physics_object.velocity;
+            
+        }
+
+
+
+
+
         if s.fruits.get(my_melon).is_some_and(|fruit| fruit.state == FruitState::Rolling) {
             ground_timer = 30;
             s.new_fruit(Vector2D::new(aim, NEW_MELON_HEIGHT));

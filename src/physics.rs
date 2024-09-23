@@ -135,3 +135,102 @@ pub fn clamp<T: PartialOrd + Copy + Clone + agb::fixnum::Number>(n: Vector2D<T>,
 
     out
 }
+
+
+
+pub struct MovingCircle {
+    before: Circle,
+    after: (Vector2D<Fixed>, Velocity)
+}
+
+impl MovingCircle {
+    pub fn before(&self) -> Circle {
+        self.before
+    }
+
+    pub fn after(&self) -> Circle {
+        Circle {
+            position: self.before.position + self.after.0 + self.after.1.0,
+            radius: 0,
+            velocity: self.after.1,
+        }
+    }
+
+    pub fn movement(&self) -> Vector2D<Fixed> {
+        let t_0 = self.before();
+        let t_1 = self.after();
+
+        t_1.position - t_0.position
+    }
+}
+
+pub fn two_circle_interpolate(circle_a: MovingCircle, circle_b: MovingCircle) -> Fixed {
+
+    // At some point, these two circles have to touch
+    // Circles touch when d^2 = (r_a + r_b)^2
+    // Solve for this equation
+    
+    // Assertations:
+    // at t=0, d^2 > (r_a + r_b)^2
+    // at t=1, d^2 < (r_a + r_b)^2
+    // at t=n, where n > 0 & n < 1, d^2 = (r_a + r_b)^2
+    
+    // Constant
+    let radii_squared = (circle_a.before.radius + circle_b.before.radius)^2;
+
+    // At t=0
+    let distance_squared = ((circle_b.before().position) - (circle_a.before().position)).magnitude_squared();
+
+    
+    // At t=1
+    // let distance_squared = ((circle_b.after().position) - (circle_a.after().position)).magnitude_squared();
+    
+    
+    // (x_a + (t*v_a) + x_b)  = (r_a + r_b)^2
+    
+    let pythagorean_distance = {
+        
+        let t = num!(1.0);
+        
+        let v_a = circle_a.after.1.0;
+        let v_b = circle_b.after.1.0;
+        
+        let p_a = circle_a.before.position;
+        let p_b = circle_b.before.position;
+
+        let x = (p_a.x + t * v_a.x) + (p_b.x + t * v_b.x);
+        let y = (p_a.y + t * v_a.y) + (p_b.y + t * v_b.y);
+
+        (x * x + y * y).sqrt()
+        
+    };
+
+
+    // a,b,c,d = 𝑣2(𝑥),𝑣1(𝑥),𝑣2(𝑦),𝑣1(𝑦)
+    let (a, b, c, d) = (circle_b.after.1.0.x, circle_a.after.1.0.x, circle_b.after.1.0.y, circle_a.after.1.0.y);
+    let (x1, x2, y1, y2) = (circle_a.before.position.x, circle_b.before.position.x, circle_a.before.position.y, circle_b.before.position.y, );
+
+    // 𝐴=(𝑎−𝑏)2+(𝑐−𝑑)2
+    // 𝐵=2((𝑥2−𝑥1)(𝑎−𝑏)+(𝑦2−𝑦1)(𝑐−𝑑))
+    // 𝐶=𝑥12+𝑥22+𝑥32+𝑥42−2(𝑥1𝑥2+𝑥3𝑥4)−(𝑟1+𝑟2)2
+    let two: Fixed = num!(2.0);
+    
+    let quadr_a = (a - b) * 2 + (c - d) * 2;
+    let quadr_b = two * ( (x2 - x1) * (a - b) + (y2 - y1) * (c - d));
+    let quadr_c = (x1 * x1) + (x2 * x2) + (y1 * y1) + (y2 * y2) - two * ( x1 * x2 + y1 * y2) - two * (circle_a.before.radius + circle_b.before.radius); 
+    
+    // 𝑇= ( −𝐵±√(𝐵^2−4𝐴𝐶) ) / 2𝐴
+    
+    let discriminant = (quadr_b * quadr_b) - num!(4.) * quadr_a * quadr_c;
+    
+    let t1 = ( - quadr_b + discriminant.sqrt() ) / two * quadr_a;
+
+    let t2 = ( - quadr_b - discriminant.sqrt() ) / two * quadr_a;
+    
+    let t = t1.min(t2);
+    
+    
+    t
+    
+
+}

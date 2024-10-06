@@ -43,3 +43,7 @@ impl FixedExtend for Fixed {
         num!(1.57079) - num!(1.57079) * x
     }
 }
+
+pub fn sq(num: Fixed) -> Fixed {
+    num * num
+}

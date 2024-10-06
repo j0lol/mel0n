@@ -4,8 +4,6 @@
 #![cfg_attr(test, reexport_test_harness_main = "test_main")]
 #![cfg_attr(test, test_runner(agb::test_runner::test_runner))]
 
-use alloc::borrow::ToOwned;
-use agb::display::tiled::TiledMap;
 pub mod physics;
 pub mod fruit;
 pub mod math_helpers;
@@ -13,22 +11,22 @@ pub mod world;
 
 extern crate alloc;
 
+use agb::display::tiled::TiledMap;
 use agb::display::tiled::RegularBackgroundSize;
 use crate::world::State;
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::mem::swap;
-use agb::display::object::{AffineMatrixInstance, Graphics, GraphicsMode, ObjectUnmanaged};
+use agb::display::object::{AffineMatrixInstance, Graphics, ObjectUnmanaged};
 use agb::display::{Priority, HEIGHT, WIDTH};
 use agb::fixnum::{num, Num, Vector2D};
 use agb::{include_aseprite, include_background_gfx, println, Gba};
-use agb::display::affine::{AffineMatrix};
+use agb::display::affine::AffineMatrix;
 use agb::input::{Button, ButtonController};
 use agb::interrupt::VBlank;
-use crate::fruit::{FruitState, TERMINAL_VELOCITY};
-use crate::math_helpers::{fsplat, fvec, iclamp, isplat, FixedExtend};
-use crate::physics::{clamp, Velocity};
+use crate::fruit::{Fruit, FruitState, TERMINAL_VELOCITY};
+use crate::math_helpers::{fsplat, fvec, iclamp, isplat};
+use crate::physics::{clamp, Ball, Velocity};
 
 const FLOOR: i32 = 148;
 const WALL_L: i32 = 62;
@@ -76,10 +74,12 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
     const NEW_MELON_HEIGHT: i32 = 16;
 
     s.new_fruit(Vector2D::new(90, NEW_MELON_HEIGHT));
+    
+    s.fruits[0].velocity.0 = Vector2D::new(num!(0.), num!(1.));
 
     let mut my_melon = 0;
 
-    let mut ground_timer = 30;
+    let mut ground_timer = 300;
 
     let mut aim = 90;
 
@@ -104,6 +104,9 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
         for fruit in s.fruits.iter_mut() {
             fruit.collided_with_fruits = vec![];
         }
+        
+        
+        let next_fruit_cycle = Vec::<Fruit>::new();
 
         for current_fruit in 0..s.fruits.len() {
 
@@ -131,14 +134,14 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
             // Make potential physics object
             let mut fruit_physics_object = fruit.circle();
             fruit_physics_object.velocity = Velocity(if fruit.state != FruitState::Held {
-                let gravity: Fixed = Num::new(98)/1000;
+                // let gravity: Fixed = Num::new(98)/1000;
+                let gravity: Fixed = Num::new(98)/10000;
                 clamp(
                     fruit.velocity.0 + Vector2D::new(num!(0.), gravity),
                     fsplat(-TERMINAL_VELOCITY),
                     fsplat(TERMINAL_VELOCITY)
                 )
             } else { fsplat(0.0) });
-            fruit_physics_object.position += fruit.velocity.0;
 
             // Collide with other fruits
             {
@@ -147,6 +150,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                         .iter_mut()
                         .enumerate()
                         .filter(|(n, fruit)| {*n != current_fruit
+                            && fruit.state != FruitState::Held
                             && !fruit.collided_with_fruits.contains(&current_fruit)
                         })
                         .collect()
@@ -154,21 +158,21 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
 
                 // Collide with walls
                 let wall_nudge = fruit_physics_object.in_playfield().unwrap_or(fsplat(0.0));
-
+                
                 // println!("FRUIT {current_fruit} WALLNUDGE {wall_nudge:?}");
-
+                
                 if wall_nudge.y != num!(0.) {
                     // Friction
-                    // fruit_physics_object.velocity.0.x *= num!(0.98);
-
+                    fruit_physics_object.velocity.0.x *= num!(0.98);
+                
                     // Apply bouncing
                     fruit_physics_object.velocity.0.y *= num!(-0.25);
                 }
-
+                
                 if wall_nudge.x != num!(0.) {
                     fruit_physics_object.velocity.0.x *= num!(-0.25);
                 }
-
+                
                 // if wall_nudge != fsplat(0.0) {
                 //     if fruit_physics_object.velocity.0.x.abs() <= num!(0.3) {
                 //         fruit_physics_object.velocity.0.x = num!(0.);
@@ -177,68 +181,118 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                 //         fruit_physics_object.velocity.0.y = num!(0.);
                 //     }
                 // }
-
-                nudge += wall_nudge;
+                
+                // nudge += wall_nudge;
+                
+                
                 
                 
                 for (n, other_fruit) in rest.into_iter() {
-                    let circle_nudge = fruit_physics_object.intersects(other_fruit.circle());
-                    if let Some( circle_nudge) = circle_nudge {
-                        
-                        // fruit_physics_object.position += nudge;
-                        let mut marker_obj = ObjectUnmanaged::new(*s.sprites[1].to_owned());
-                        marker_obj.set_position(fruit_physics_object.position.floor() - isplat(4));
-                        marker_obj.show();
-                        misc_objects.push(marker_obj);
+                    
+                    collided_with.push(n);
+                    
+                    let intersecting = fruit_physics_object.intersects(other_fruit.circle());
 
 
-                        let c_a = fruit_physics_object;
-                        let c_b = other_fruit.circle();
+                    let ball_a = Ball::from_circle(fruit_physics_object);
+                    let ball_b = Ball::from_circle(other_fruit.circle());
+                    let t = ball_b.time_to_collision(&ball_a);
+                    
+                    // let t = two_circle_interpolate(fruit_physics_object, other_fruit_moving);
+                    println!("t: {t}");
+                    // let mut other_fruit_moving = MovingCircle::new(other_fruit.circle());
+                    // other_fruit_moving.after.1 = other_fruit.velocity;
+                    if intersecting {
+                        // println!("Intersecting");
                         
-                        let v_a = c_a.velocity.0;
-                        let v_b = c_b.velocity.0;
+                        fruit_physics_object.velocity.0 *= t;
+                        other_fruit.velocity.0 *= t;
                         
-                        let total_magnitude = v_a.magnitude() + v_b.magnitude();
-                        
-                        
-                        let vec_ab = c_b.position - c_a.position;
-                        
-                        other_fruit.velocity.0 = (vec_ab / 5).normalise() * (total_magnitude / 2);
-                        fruit_physics_object.velocity.0 = (-vec_ab / 5).normalise() * (total_magnitude / 2);
-                        
-                        // try fix rounding errors
-                        for mut velocity in [other_fruit.velocity, fruit_physics_object.velocity] {
-                            if velocity.0.magnitude() <= num!(0.5) {
-                                velocity.0 = fsplat(0.0);
-                            }
+                        println!("F1V {:?} F2V {:?}", fruit_physics_object.velocity.0, other_fruit.velocity.0);
+
+                        if t <= num!(0.0) {
+                            println!("INTERSECTION PREVENTION");
+                            
+                            let propulsion = iclamp( (t / 4).abs(),num!(0.01),num!(1.));
+                            
+                            println!("{propulsion}");
+                            
+                            let vec_ab = other_fruit.circle().position - fruit_physics_object.position;
+                            
+                            // let total_magnitude =  other_fruit.velocity.0.fast_magnitude() + (fruit_physics_object.velocity.0.fast_magnitude());
+                            
+                            other_fruit.velocity.0 = vec_ab.normalise() * propulsion;
+                            fruit_physics_object.velocity.0 = (-vec_ab).normalise() * propulsion; 
                         }
-                        
-                        
-                        // let ratio = Num::new(c_a.radius)/distance;
-                        // 
-                        // let coincident = vec_ab * ratio;
-                        // 
-                        // let angle = ((c_b.position.x - c_a.position.x) / distance).acos();
-                        // 
-                        // let theta_b = ( c_b.velocity.0.x / c_b.velocity.0.magnitude()).cos();
-                        // 
-                        // let aoi = (-(theta_b - angle)) + angle;
 
-                        
-                        collided_with.push(n);
-
-                        // swap(&mut fruit_physics_object.velocity.0, &mut other_fruit.velocity.0);
-                        // other_fruit.set_position(
-                        //     other_fruit.get_position() +
-                        //         other_fruit.circle().intersects(fruit_physics_object).unwrap_or(fsplat(0.0))
+                        // let vec_ab = other_fruit.circle().position - fruit_physics_object.position;
                         // 
-                        // );
-                        // other_fruit.set_position(
-                        //     other_fruit.get_position() +
-                        //         other_fruit.circle().in_playfield().unwrap_or(fsplat(0.0))
-                        // );
+                        // let total_magnitude =  other_fruit.velocity.0.fast_magnitude() + (fruit_physics_object.velocity.0.fast_magnitude());
+                        // 
+                        // other_fruit.velocity.0 = vec_ab.normalise() * total_magnitude/2;
+                        // fruit_physics_object.velocity.0 = (-vec_ab).normalise() * total_magnitude/2; 
+                        
+                    } else {
+                        // println!("Not intersecting lol")
                     }
-                    nudge += circle_nudge.unwrap_or(fsplat(0.0));
+                    // let circle_nudge = fruit_physics_object.intersects(other_fruit.circle());
+                    // if let Some( circle_nudge) = circle_nudge {
+                    //     
+                    //     // fruit_physics_object.position += nudge;
+                    //     let mut marker_obj = ObjectUnmanaged::new(*s.sprites[1].to_owned());
+                    //     marker_obj.set_position(fruit_physics_object.position.floor() - isplat(4));
+                    //     marker_obj.show();
+                    //     misc_objects.push(marker_obj);
+                    // 
+                    // 
+                    //     let c_a = fruit_physics_object;
+                    //     let c_b = other_fruit.circle();
+                    // 
+                    //     let v_a = c_a.velocity.0;
+                    //     let v_b = c_b.velocity.0;
+                    // 
+                    //     let total_magnitude = v_a.magnitude() + v_b.magnitude();
+                    // 
+                    // 
+                    //     let vec_ab = c_b.position - c_a.position;
+                    // 
+                    //     other_fruit.velocity.0 = (vec_ab / 5).normalise() * (total_magnitude / 2);
+                    //     fruit_physics_object.velocity.0 = (-vec_ab / 5).normalise() * (total_magnitude / 2);
+                    // 
+                    //     // try fix rounding errors
+                    //     for mut velocity in [other_fruit.velocity, fruit_physics_object.velocity] {
+                    //         if velocity.0.magnitude() <= num!(0.5) {
+                    //             velocity.0 = fsplat(0.0);
+                    //         }
+                    //     }
+                    //     
+                    //     
+                    //     // let ratio = Num::new(c_a.radius)/distance;
+                    //     // 
+                    //     // let coincident = vec_ab * ratio;
+                    //     // 
+                    //     // let angle = ((c_b.position.x - c_a.position.x) / distance).acos();
+                    //     // 
+                    //     // let theta_b = ( c_b.velocity.0.x / c_b.velocity.0.magnitude()).cos();
+                    //     // 
+                    //     // let aoi = (-(theta_b - angle)) + angle;
+                    // 
+                    //     
+                    //     collided_with.push(n);
+                    // 
+                    //     // swap(&mut fruit_physics_object.velocity.0, &mut other_fruit.velocity.0);
+                    //     // other_fruit.set_position(
+                    //     //     other_fruit.get_position() +
+                    //     //         other_fruit.circle().intersects(fruit_physics_object).unwrap_or(fsplat(0.0))
+                    //     // 
+                    //     // );
+                    //     // other_fruit.set_position(
+                    //     //     other_fruit.get_position() +
+                    //     //         other_fruit.circle().in_playfield().unwrap_or(fsplat(0.0))
+                    //     // );
+                    // }
+                    // nudge += circle_nudge.unwrap_or(fsplat(0.0));
+
                 };
             }
 
@@ -271,6 +325,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
                 }
             }
 
+
             // println!("FRUIT {current_fruit} POSITION {:?}", fruit_physics_object.position);
             // println!("FRUIT {current_fruit} VELOCITY {:?}", fruit_physics_object.velocity.0);
             fruit.set_position(fruit.get_position() + fruit_physics_object.velocity.0 + nudge);
@@ -290,7 +345,7 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
 
 
         for current_fruit in 0..s.fruits.len() {
-
+            
             // Get fruit & change state
             let fruit = &mut s.fruits[current_fruit];
             if fruit.state == FruitState::Held {
@@ -343,9 +398,11 @@ fn falling_block_game(gba: &'static mut Gba) -> ! {
 
 
         if s.fruits.get(my_melon).is_some_and(|fruit| fruit.state == FruitState::Rolling) {
-            ground_timer = 30;
+            ground_timer = 300;
             s.new_fruit(Vector2D::new(aim, NEW_MELON_HEIGHT));
             my_melon += 1;
+
+            s.fruits[my_melon].velocity.0 = Vector2D::new(num!(0.), num!(1.));
         }
 
 

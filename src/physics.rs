@@ -2,7 +2,8 @@ use crate::physics::Wall::{Horizontal, Vertical};
 use crate::{Fixed, FLOOR, WALL_L, WALL_R};
 use agb::fixnum::{num, Num, Vector2D};
 use core::cmp::PartialEq;
-
+use agb::println;
+use crate::math_helpers::{fsplat, sq};
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Velocity(pub Vector2D<Fixed>);
@@ -62,7 +63,7 @@ pub static PLAY_AREA: (Wall, Wall, Wall) = (Horizontal(WALL_L, WallDirectionHori
 impl Circle {
 
     /// Returns a vector containing the amount in each direction that the circle intersected with another.
-    pub(crate) fn intersects(self: &Circle, b: Circle) -> Option<Vector2D<Fixed>> {
+    pub(crate) fn intersects(self: &Circle, b: Circle) -> bool {
         let a = self;
 
         // AB: get vector pointing from A_p to B_p
@@ -77,15 +78,17 @@ impl Circle {
 
 
         // If the intersection is positive, there is a collision
-        if intersection_magnitude > num!(0.) {
+        // if intersection_magnitude > num!(0.) {
+        //
+        //     // Create a vector with angle of AB and magnitude of the intersection
+        //     // let intersection_vector = vector_ab.normalise() * intersection_magnitude;
+        //     // Some(intersection_vector)
+        //
+        // } else {
+        //     // None
+        // }
 
-            // Create a vector with angle of AB and magnitude of the intersection
-            let intersection_vector = vector_ab.normalise() * intersection_magnitude;
-            Some(intersection_vector)
-
-        } else {
-            None
-        }
+        intersection_magnitude > num!(0.)
     }
 
     fn contains(self: Circle, p: Vector2D<Fixed>) -> bool {
@@ -138,12 +141,21 @@ pub fn clamp<T: PartialOrd + Copy + Clone + agb::fixnum::Number>(n: Vector2D<T>,
 
 
 
+#[derive(Clone, Copy)]
 pub struct MovingCircle {
     before: Circle,
-    after: (Vector2D<Fixed>, Velocity)
+    pub(crate) after: (Vector2D<Fixed>, Velocity)
 }
 
 impl MovingCircle {
+
+    pub fn new(circle: Circle) -> MovingCircle {
+        MovingCircle {
+            before: circle,
+            after: (fsplat(0.0), Velocity(fsplat(0.0)))
+        }
+    }
+
     pub fn before(&self) -> Circle {
         self.before
     }
@@ -210,27 +222,92 @@ pub fn two_circle_interpolate(circle_a: MovingCircle, circle_b: MovingCircle) ->
     let (a, b, c, d) = (circle_b.after.1.0.x, circle_a.after.1.0.x, circle_b.after.1.0.y, circle_a.after.1.0.y);
     let (x1, x2, y1, y2) = (circle_a.before.position.x, circle_b.before.position.x, circle_a.before.position.y, circle_b.before.position.y, );
 
-    // 𝐴=(𝑎−𝑏)2+(𝑐−𝑑)2
+    // 𝐴=(𝑎−𝑏)^2+(𝑐−𝑑)^2
     // 𝐵=2((𝑥2−𝑥1)(𝑎−𝑏)+(𝑦2−𝑦1)(𝑐−𝑑))
-    // 𝐶=𝑥12+𝑥22+𝑥32+𝑥42−2(𝑥1𝑥2+𝑥3𝑥4)−(𝑟1+𝑟2)2
+    // 𝐶=𝑥1^2+𝑥2^2+𝑥3^2+𝑥4^2−2(𝑥1𝑥2+𝑥3𝑥4)−(𝑟1+𝑟2)^2
     let two: Fixed = num!(2.0);
     
-    let quadr_a = (a - b) * 2 + (c - d) * 2;
+    let quadr_a = sq(a - b) + sq(c - d);
     let quadr_b = two * ( (x2 - x1) * (a - b) + (y2 - y1) * (c - d));
-    let quadr_c = (x1 * x1) + (x2 * x2) + (y1 * y1) + (y2 * y2) - two * ( x1 * x2 + y1 * y2) - two * (circle_a.before.radius + circle_b.before.radius); 
-    
+    let quadr_c_a = sq(x1) + sq(x2) + sq(y1) + sq(y2);
+    let quadr_c_b = two * ( (x1 * x2) + (y1 * y2));
+    let quadr_c_c =  sq(Fixed::from(circle_a.before.radius + circle_b.before.radius));
+
+    let quadr_c = sq(x1) + sq(x2) + sq(y1) + sq(y2) - (two * ( (x1 * x2) + (y1 * y2) )) - sq(Fixed::from(circle_a.before.radius + circle_b.before.radius));
+
+    println!("QUAD SOLVE: A: {quadr_a}, B: {quadr_b}, C: {quadr_c}");
+    println!("QUAD SOLVE: Ca: {quadr_c_a}, Cb: {quadr_c_b}, Cc: {quadr_c_c}");
     // 𝑇= ( −𝐵±√(𝐵^2−4𝐴𝐶) ) / 2𝐴
     
-    let discriminant = (quadr_b * quadr_b) - num!(4.) * quadr_a * quadr_c;
+    let discriminant = sq(quadr_b) - num!(4.) * quadr_a * quadr_c;
+
+    println!("discriminant: {discriminant}");
     
     let t1 = ( - quadr_b + discriminant.sqrt() ) / two * quadr_a;
-
     let t2 = ( - quadr_b - discriminant.sqrt() ) / two * quadr_a;
-    
-    let t = t1.min(t2);
+
+    println!("QUAD SOLVE: {t1}, {t2}");
+    let t = t1.abs().min(t2.abs());
     
     
     t
     
 
+}
+
+
+pub struct Ball {
+    x: Fixed,
+    y: Fixed,
+    xvel: Fixed,
+    yvel: Fixed,
+    radius: Fixed,
+}
+
+impl Ball {
+    
+    
+    pub fn from_circle(circle: Circle) -> Ball {
+        Ball {
+            x: circle.position.x,
+            y: circle.position.y,
+            xvel: circle.velocity.0.x,
+            yvel: circle.velocity.0.y,
+            radius: circle.radius.into()
+        }
+    }
+    
+    pub fn time_to_collision(&self, other: &Ball) -> Num<i32, 8> {
+
+        let radius = self.radius;
+        let xvel = self.xvel;
+        let yvel = self.yvel;
+        let x = self.x;
+        let y = self.y;
+        let distance = (radius + other.radius) * (radius + other.radius);
+        let a = (xvel - other.xvel) * (xvel - other.xvel) + (yvel - other.yvel) * (yvel - other.yvel);
+        let b = num!(2.) * ((x - other.x) * (xvel - other.xvel) + (y - other.y) * (yvel - other.yvel));
+        let c = (x - other.x) * (x - other.x) + (y - other.y) * (y - other.y) - distance;
+        let d = b * b - num!(4.) * a * c;
+
+        
+        let (t1, t2) = if a == num!(0.0) {
+            (num!(0.), num!(0.))
+        } else {
+            let e = if d > num!(0.) {d.sqrt()} else {num!(0.)};
+            let t1 = (-b - e) / (num!(2.) * a);    // Collison time, +ve or -ve
+            let t2 = (-b + e) / (num!(2.) * a);    // Exit time, +ve or -ve
+
+            (t1, t2)
+        };
+        
+
+        
+        // println!("t1 {t1}, t2 {t2}");
+        
+        // if (t1 < num!(0.) && t2 > num!(0.) && b <= num!(-1e-6)) {
+        //     return num!(0.);
+        // }
+        t1
+    }
 }

@@ -1,5 +1,5 @@
-use agb::fixnum::{num, Num, Vector2D};
 use crate::Fixed;
+use agb::fixnum::{num, Num, Vector2D};
 
 pub fn fvec<T: agb::fixnum::Number + agb::fixnum::FixedWidthUnsignedInteger, const N: usize>(
     x: f32,
@@ -20,20 +20,20 @@ pub fn fsplat<T: agb::fixnum::Number + agb::fixnum::FixedWidthUnsignedInteger, c
     fvec(x, x)
 }
 
-
-pub fn iclamp<T: PartialOrd + Copy + Clone + agb::fixnum::Number>(n: T, lower:T, upper: T) -> T{
+pub fn iclamp<T: PartialOrd + Copy + Clone + agb::fixnum::Number>(n: T, lower: T, upper: T) -> T {
     let mut out = n;
-    
-    if n < lower { out = lower; }
-    if n > upper { out = upper; }
+
+    if n < lower {
+        out = lower;
+    }
+    if n > upper {
+        out = upper;
+    }
 
     out
 }
 
-
-
 pub trait FixedExtend {
-    
     fn acos(self) -> Self;
 }
 

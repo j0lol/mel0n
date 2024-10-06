@@ -14,7 +14,7 @@ pub struct Rotation {
 pub enum FruitState {
     Held,
     Falling,
-    Rolling
+    Rolling,
 }
 pub struct Fruit {
     pub world_object: ObjectUnmanaged,
@@ -32,7 +32,8 @@ impl Fruit {
 
     pub fn set_position(&mut self, position: Vector2D<Fixed>) {
         self.real_position = position;
-        self.world_object.set_position(position.floor() - Vector2D::new(16, 16));
+        self.world_object
+            .set_position(position.floor() - Vector2D::new(16, 16));
     }
     pub fn circle(&self) -> Circle {
         Circle {
